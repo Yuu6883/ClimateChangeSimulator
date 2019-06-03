@@ -52693,7 +52693,7 @@ module.exports = class Game {
         /** @type {Tile} */
         this.selectedTile = undefined
         Swal.fire({
-            title: "<img src='https://i.imgur.com/v3zLi5p.png'>",
+            title: "<img src='https://i.imgur.com/v3zLi5p.png' style='width: 100%'>",
             html: "<p>wcwp project</p>",
             width: 700,
             confirmButtonText: "Play",
