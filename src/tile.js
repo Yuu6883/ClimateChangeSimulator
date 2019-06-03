@@ -7,6 +7,7 @@ const MapCenter = {
     x: Border.x / 2,
     y: Border.y / 2
 }
+const Swal = require("sweetalert2").default;
 
 module.exports = class Tile {
 
@@ -70,11 +71,16 @@ module.exports = class Tile {
     /** @param {import("pixi.js").interaction.InteractionEvent} e */
     onClick(e) {
         this.game.clickTile(this, e.data.global);
+        
     }
 
     /** @param {import("pixi.js").interaction.InteractionEvent} e */
     onMouseover(e) {
-        this.game.mouseOverTile(this, e.data.global);
+        try {
+            this.game.mouseOverTile(this, e.data.global);
+        } catch (e) {
+            Swal.fire(e.message, e.stack, "error");
+        }
     }
 
     getText() {
