@@ -23,6 +23,7 @@ module.exports = class Tile {
         this.shape.hitArea = this.polygon;
         this.shape.interactive = true;
         this.shape.on("click", e => this.onClick(e));
+        this.shape.on("touchstart", e => this.onClick(e));
         this.shape.on("mouseover", e => this.onMouseover(e));
         this.scale = Math.max(this.bound.xMax - this.bound.xMin, this.bound.yMax - this.bound.yMin) / 100;
         
