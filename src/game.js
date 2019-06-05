@@ -3,14 +3,15 @@ const Viewport = require("pixi-viewport");
 const { Delaunay } = require("d3-delaunay");
 const { Noise } = require("noisejs");
 const Tile = require("./tile");
-const { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, buttonOffset, buttonBox } = require("./constants");
-const { centeroid, distanceTo } = require("./util");
+const { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, buttonOffset, buttonBox, gameTick } = require("./constants");
+const { centeroid, distanceTo, select } = require("./util");
 const Swal = require("sweetalert2").default;
 const MapCenter = {
     x: Border.x / 2,
     y: Border.y / 2
 }
 const Sprites = require("./sprites.json");
+const Disasters = require("./disasters.json");
 
 module.exports = class Game {
     constructor() {
@@ -19,10 +20,10 @@ module.exports = class Game {
         this.textures = {};
         
         /** @type {Tile} */
-        this.selectedTile = undefined
+        this.selectedTile = undefined;
         Swal.fire({
             title: "<img src='https://i.imgur.com/v3zLi5p.png' style='width: 100%'>",
-            html: "<p>wcwp project</p>",
+            html: "<p></p>",
             width: 700,
             confirmButtonText: "Play",
             confirmButtonColor: "#29aec6",
@@ -34,6 +35,11 @@ module.exports = class Game {
         this.CO2Emission = 0;
         this.temperature = 0;
         this.hazardWeatherRate = 0.01;
+        this.time = 0;
+        this.lastNaturalDisaster = -100;
+        /** @type {Tile} */
+        this.tileMouseover = undefined;
+        this.paused = false;
     }
 
     init() {
@@ -54,6 +60,7 @@ module.exports = class Game {
                     this.initSeedAndNoise();
                     this.generateBackground();
                     this.generateMap();
+                    this.gameloop = setInterval(() => this.tick(), gameTick);
                 }, 500);
             }
         });
@@ -119,6 +126,7 @@ module.exports = class Game {
         tileViewer.addChild(button);
         this.tileViewer.addChild(tileText);
         this.tileText = tileText;
+        this.population = 1000;
     
         viewport
             .drag()
@@ -198,7 +206,7 @@ module.exports = class Game {
     disselect() {
         this.button.visible = false;
         this.tileViewer.visible = false;
-        this.selectedTile.generateGraphics();
+        if (this.selectedTile) this.selectedTile.generateGraphics();
         this.selectedTile = undefined;
     }
 
@@ -233,27 +241,103 @@ module.exports = class Game {
         button.endFill();
     }
 
-    tick() {
+    pause() {
+        this.paused = true;
+    }
 
+    resume() {
+        this.paused = false;
+    }
+
+    tick() {
+        if (this.paused) return;
+        this.time++;
         this.CO2Emission = this.calculateEmission() - this.forestAbsorption();
-        this.temperature += 0.01 * this.CO2Emission;
-        this.hazardWeatherRate = 0.01 * this.temperature;
+        this.temperature += 0.00001 * this.CO2Emission;
+        this.temperature = Math.min(Math.max(this.temperature, 0), 995);
+        this.hazardWeatherRate = 0.01 * this.temperature + 0.005;
 
         if (Math.random() <= this.hazardWeatherRate) {
             this.createNaturalDisaster();
         }
+        this.updateResources();
+        this.updateViewer(this.selectedTile || this.tileMouseover);
+
+        if (this.time % 100 == 0) console.log(`Emission: ${this.CO2Emission.toFixed(2)}, Temperature ${this.temperature.toFixed(2)}`);
+    }
+
+    updateResources() {
+        for (let tile of this.tiles) {
+            tile.updateResource()
+        }
     }
 
     calculateEmission() {
-        return 0
+        let sum = 0;
+        for (let building of this.buildings) {
+            if (!building.functional) continue;
+            switch (building.type) {
+                case "Power Plant":
+                    sum += 50;
+                    break;
+                case "Drill Platform":
+                case "Oil Drill":
+                    sum += 30;
+                    break;
+                case "Ranch":
+                    sum += 5;
+                    break;
+            }
+        }
+        return sum
     }
 
     forestAbsorption() {
-        return 0
+        let sum = 0;
+        for (let building of this.buildings) {
+            switch (building.type) {
+                case "Forest":
+                    sum += building.tile.resource.tree / 2000;
+                    break;
+            }
+        }
+        return Math.floor(sum)
     }
 
     createNaturalDisaster() {
-
+        if (this.time - this.lastNaturalDisaster < 3000 / gameTick) return;
+        this.lastNaturalDisaster = this.time;
+        console.log(`Disaster!! Rate: ${this.hazardWeatherRate}`);
+        this.pause();
+        /** @type {Tile} */
+        let randomTile = select(this.tiles);
+        console.log(randomTile.biome, randomTile.isOcean());
+        this.viewport.snap(...randomTile.center, {interrupt: false,removeOnComplete: true});
+        let disaster;
+        if (randomTile.isOcean()) {
+            disaster = select(Disasters["ocean"]);
+        } else {
+            disaster = select(Disasters["land"]);
+        }
+        if (randomTile.building) randomTile.building.disable();
+        this.disselect();
+        randomTile.generateGraphics(true, true);
+        setTimeout(() => {
+            Swal.fire({
+                title: disaster.name + (randomTile.building ? `destroyed the ${randomTile.building.type} here`: ""),
+                html: `<img width=600 height=400 src="${disaster.url}">`,
+                width: 700,
+                confirmButtonText: "Oh no...",
+                confirmButtonColor: "#29aec6",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                allowEnterKey: false,
+                onBeforeOpen: () => randomTile.destroyBuilding()
+            }).then(() => {
+                this.resume();
+                randomTile.generateGraphics();
+            })
+        }, 2000);
     }
 
     generateBackground() {
@@ -361,6 +445,7 @@ module.exports = class Game {
      * @param {import("pixi.js").Point} pos
      */
     clickTile(tile, pos) {
+        if (this.paused) return;
         if (this.selectedTile) {
             this.selectedTile = undefined;
             this.mouseOverTile(tile, pos);
@@ -392,6 +477,8 @@ module.exports = class Game {
      * @param {import("pixi.js").Point} pos
      */
     mouseOverTile(tile, pos) {
+        if (this.paused) return;
+        this.tileMouseover = tile;
         if (this.selectedTile) return;
         if (this.lastMouseoverTile) {
             this.lastMouseoverTile.generateGraphics(false);
@@ -402,13 +489,18 @@ module.exports = class Game {
         this.tileViewer.pivot.x = left ? ViewBox.x : 0;
         this.tileViewer.pivot.y = top ? ViewBox.y : 0
         this.tileViewer.position.set(pos.x, pos.y);
+        this.updateViewer(tile);
+        tile.generateGraphics(true);
+        this.lastMouseoverTile = tile;
+    }
+
+    updateViewer(tile) {
+        if (!tile || !tile.resource) return
         let newText = tile.getText();
         this.tileViewer.clear();
         this.tileViewer.beginFill(0x000000, 0.5);
         this.tileViewer.drawRoundedRect(0, 0, ViewBox.x, ViewBox.y * newText.split("\n").length, 40);
         this.tileViewer.endFill();
         this.tileText.text = newText;
-        tile.generateGraphics(true);
-        this.lastMouseoverTile = tile;
     }
 }

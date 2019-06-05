@@ -11,6 +11,7 @@ module.exports = {
         x: 300,
         y: 50
     },
+    gameTick: 100,
     buttonBox: [80, 40],
     TextureScaleDown: 10,
     NumTiles: 200,
@@ -20,7 +21,7 @@ module.exports = {
     OilChance: 0.2,
     OilRange: [1000, 10000],
     FishChance: 0.5,
-    FishRange: [300, 2000],
+    FishRange: [500, 2000],
     WindChance: 0.4,
     WindRange: [500, 3000],
     AnimalChance: 0.8,

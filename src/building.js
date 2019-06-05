@@ -7,13 +7,15 @@ module.exports = class Building {
     constructor(tile, type) {
         this.tile = tile;
         this.type = type;
+        this.functional = true;
+        this.warning = false;
     }
 
-    onUpdate() {
-        switch (type) {
-            case "Fish":
-                
-                break;
-        }
+    disable() {
+        this.functional = false;
+    }
+
+    enable() {
+        this.functional = true;
     }
 }

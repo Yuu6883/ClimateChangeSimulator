@@ -44,7 +44,7 @@ module.exports = class Resource {
         if (this.fish) buildable.push("Fish Farm");
         if (this.solar) buildable.push("Solar Panel");
         if (this.animal) buildable.push("Ranch");
-        if (this.tree) buildable.push("Forest");
+        if (this.tile.biome.includes("forest")) buildable.push("Forest");
         if (this.wind) buildable.push("Wind Turbine");
         return buildable;
     }
@@ -58,7 +58,7 @@ module.exports = class Resource {
         if (this.tree) string += this.tree + " 🌲 Forest\n\n";
         if (this.coal) string += this.coal + " ⛏️ Coal\n\n";
         if (this.solar) string += this.solar + " ☀️ Sunlight\n\n";
-        if (string == "\n") string += "No Resources"
+        if (string == "\n") string += "No Resources\n\n"
         return string;
     }
 }

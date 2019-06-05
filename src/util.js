@@ -45,4 +45,5 @@ module.exports = {
     randint: (min, max) => Math.floor(Math.random() * (max - min) + min),
     /** @param {String} s */
     capitalize: s => s.split(" ").map(v => v[0].toUpperCase() + v.slice(1)).join(" "),
+    select: arr => arr[Math.floor(Math.random() * arr.length)]
 }

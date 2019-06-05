@@ -52626,14 +52626,16 @@ module.exports = class Building {
     constructor(tile, type) {
         this.tile = tile;
         this.type = type;
+        this.functional = true;
+        this.warning = false;
     }
 
-    onUpdate() {
-        switch (type) {
-            case "Fish":
-                
-                break;
-        }
+    disable() {
+        this.functional = false;
+    }
+
+    enable() {
+        this.functional = true;
     }
 }
 },{}],75:[function(require,module,exports){
@@ -52650,6 +52652,7 @@ module.exports = {
         x: 300,
         y: 50
     },
+    gameTick: 100,
     buttonBox: [80, 40],
     TextureScaleDown: 10,
     NumTiles: 200,
@@ -52659,7 +52662,7 @@ module.exports = {
     OilChance: 0.2,
     OilRange: [1000, 10000],
     FishChance: 0.5,
-    FishRange: [300, 2000],
+    FishRange: [500, 2000],
     WindChance: 0.4,
     WindRange: [500, 3000],
     AnimalChance: 0.8,
@@ -52670,19 +52673,39 @@ module.exports = {
     SolarRange: [1000, 2000]
 }
 },{}],76:[function(require,module,exports){
+module.exports={
+    "land": [
+        {
+            "name": "Natural Fire",
+            "url": "https://www.freshfromflorida.com/var/ezdemo_site/storage/images/media/images/florida-forest-service-images/natural_fire1.jpg/27078-1-eng-US/natural_fire1.jpg.jpg"
+        },
+        {
+            "name": "Tornado",
+            "url": "https://media3.s-nbcnews.com/j/newscms/2019_22/2869721/190524-tornado-al-1026_c59db74312a95bd67b76fde74d7611bd.fit-760w.jpg"
+        }
+    ],
+    "ocean": [
+        {
+            "name": "Hurricane",
+            "url": "https://mycomputerexperts.net/wp-content/uploads/2018/04/hurricane-palmtrees.jpg"
+        }
+    ]
+}
+},{}],77:[function(require,module,exports){
 const PIXI = require("pixi.js");
 const Viewport = require("pixi-viewport");
 const { Delaunay } = require("d3-delaunay");
 const { Noise } = require("noisejs");
 const Tile = require("./tile");
-const { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, buttonOffset, buttonBox } = require("./constants");
-const { centeroid, distanceTo } = require("./util");
+const { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, buttonOffset, buttonBox, gameTick } = require("./constants");
+const { centeroid, distanceTo, select } = require("./util");
 const Swal = require("sweetalert2").default;
 const MapCenter = {
     x: Border.x / 2,
     y: Border.y / 2
 }
 const Sprites = require("./sprites.json");
+const Disasters = require("./disasters.json");
 
 module.exports = class Game {
     constructor() {
@@ -52691,10 +52714,10 @@ module.exports = class Game {
         this.textures = {};
         
         /** @type {Tile} */
-        this.selectedTile = undefined
+        this.selectedTile = undefined;
         Swal.fire({
             title: "<img src='https://i.imgur.com/v3zLi5p.png' style='width: 100%'>",
-            html: "<p>wcwp project</p>",
+            html: "<p></p>",
             width: 700,
             confirmButtonText: "Play",
             confirmButtonColor: "#29aec6",
@@ -52706,6 +52729,11 @@ module.exports = class Game {
         this.CO2Emission = 0;
         this.temperature = 0;
         this.hazardWeatherRate = 0.01;
+        this.time = 0;
+        this.lastNaturalDisaster = -100;
+        /** @type {Tile} */
+        this.tileMouseover = undefined;
+        this.paused = false;
     }
 
     init() {
@@ -52726,6 +52754,7 @@ module.exports = class Game {
                     this.initSeedAndNoise();
                     this.generateBackground();
                     this.generateMap();
+                    this.gameloop = setInterval(() => this.tick(), gameTick);
                 }, 500);
             }
         });
@@ -52791,6 +52820,7 @@ module.exports = class Game {
         tileViewer.addChild(button);
         this.tileViewer.addChild(tileText);
         this.tileText = tileText;
+        this.population = 1000;
     
         viewport
             .drag()
@@ -52870,7 +52900,7 @@ module.exports = class Game {
     disselect() {
         this.button.visible = false;
         this.tileViewer.visible = false;
-        this.selectedTile.generateGraphics();
+        if (this.selectedTile) this.selectedTile.generateGraphics();
         this.selectedTile = undefined;
     }
 
@@ -52905,27 +52935,103 @@ module.exports = class Game {
         button.endFill();
     }
 
-    tick() {
+    pause() {
+        this.paused = true;
+    }
 
+    resume() {
+        this.paused = false;
+    }
+
+    tick() {
+        if (this.paused) return;
+        this.time++;
         this.CO2Emission = this.calculateEmission() - this.forestAbsorption();
-        this.temperature += 0.01 * this.CO2Emission;
-        this.hazardWeatherRate = 0.01 * this.temperature;
+        this.temperature += 0.00001 * this.CO2Emission;
+        this.temperature = Math.min(Math.max(this.temperature, 0), 995);
+        this.hazardWeatherRate = 0.01 * this.temperature + 0.005;
 
         if (Math.random() <= this.hazardWeatherRate) {
             this.createNaturalDisaster();
         }
+        this.updateResources();
+        this.updateViewer(this.selectedTile || this.tileMouseover);
+
+        if (this.time % 100 == 0) console.log(`Emission: ${this.CO2Emission.toFixed(2)}, Temperature ${this.temperature.toFixed(2)}`);
+    }
+
+    updateResources() {
+        for (let tile of this.tiles) {
+            tile.updateResource()
+        }
     }
 
     calculateEmission() {
-        return 0
+        let sum = 0;
+        for (let building of this.buildings) {
+            if (!building.functional) continue;
+            switch (building.type) {
+                case "Power Plant":
+                    sum += 50;
+                    break;
+                case "Drill Platform":
+                case "Oil Drill":
+                    sum += 30;
+                    break;
+                case "Ranch":
+                    sum += 5;
+                    break;
+            }
+        }
+        return sum
     }
 
     forestAbsorption() {
-        return 0
+        let sum = 0;
+        for (let building of this.buildings) {
+            switch (building.type) {
+                case "Forest":
+                    sum += building.tile.resource.tree / 2000;
+                    break;
+            }
+        }
+        return Math.floor(sum)
     }
 
     createNaturalDisaster() {
-
+        if (this.time - this.lastNaturalDisaster < 3000 / gameTick) return;
+        this.lastNaturalDisaster = this.time;
+        console.log(`Disaster!! Rate: ${this.hazardWeatherRate}`);
+        this.pause();
+        /** @type {Tile} */
+        let randomTile = select(this.tiles);
+        console.log(randomTile.biome, randomTile.isOcean());
+        this.viewport.snap(...randomTile.center, {interrupt: false,removeOnComplete: true});
+        let disaster;
+        if (randomTile.isOcean()) {
+            disaster = select(Disasters["ocean"]);
+        } else {
+            disaster = select(Disasters["land"]);
+        }
+        if (randomTile.building) randomTile.building.disable();
+        this.disselect();
+        randomTile.generateGraphics(true, true);
+        setTimeout(() => {
+            Swal.fire({
+                title: disaster.name + (randomTile.building ? `destroyed the ${randomTile.building.type} here`: ""),
+                html: `<img width=600 height=400 src="${disaster.url}">`,
+                width: 700,
+                confirmButtonText: "Oh no...",
+                confirmButtonColor: "#29aec6",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                allowEnterKey: false,
+                onBeforeOpen: () => randomTile.destroyBuilding()
+            }).then(() => {
+                this.resume();
+                randomTile.generateGraphics();
+            })
+        }, 2000);
     }
 
     generateBackground() {
@@ -53033,6 +53139,7 @@ module.exports = class Game {
      * @param {import("pixi.js").Point} pos
      */
     clickTile(tile, pos) {
+        if (this.paused) return;
         if (this.selectedTile) {
             this.selectedTile = undefined;
             this.mouseOverTile(tile, pos);
@@ -53064,6 +53171,8 @@ module.exports = class Game {
      * @param {import("pixi.js").Point} pos
      */
     mouseOverTile(tile, pos) {
+        if (this.paused) return;
+        this.tileMouseover = tile;
         if (this.selectedTile) return;
         if (this.lastMouseoverTile) {
             this.lastMouseoverTile.generateGraphics(false);
@@ -53074,21 +53183,26 @@ module.exports = class Game {
         this.tileViewer.pivot.x = left ? ViewBox.x : 0;
         this.tileViewer.pivot.y = top ? ViewBox.y : 0
         this.tileViewer.position.set(pos.x, pos.y);
+        this.updateViewer(tile);
+        tile.generateGraphics(true);
+        this.lastMouseoverTile = tile;
+    }
+
+    updateViewer(tile) {
+        if (!tile || !tile.resource) return
         let newText = tile.getText();
         this.tileViewer.clear();
         this.tileViewer.beginFill(0x000000, 0.5);
         this.tileViewer.drawRoundedRect(0, 0, ViewBox.x, ViewBox.y * newText.split("\n").length, 40);
         this.tileViewer.endFill();
         this.tileText.text = newText;
-        tile.generateGraphics(true);
-        this.lastMouseoverTile = tile;
     }
 }
-},{"./constants":75,"./sprites.json":79,"./tile":80,"./util":81,"d3-delaunay":43,"noisejs":49,"pixi-viewport":65,"pixi.js":67,"sweetalert2":73}],77:[function(require,module,exports){
+},{"./constants":75,"./disasters.json":76,"./sprites.json":80,"./tile":81,"./util":82,"d3-delaunay":43,"noisejs":49,"pixi-viewport":65,"pixi.js":67,"sweetalert2":73}],78:[function(require,module,exports){
 const Game = require("./game");
 
 $(document).ready(() => new Game());
-},{"./game":76}],78:[function(require,module,exports){
+},{"./game":77}],79:[function(require,module,exports){
 const { OilChance, OilRange, FishChance, FishRange, WindChance, WindRange,
     AnimalChance, AnimalRange, ForestRange, CoalChance, CoalRange,
     SolarRange } = require("./constants");
@@ -53135,7 +53249,7 @@ module.exports = class Resource {
         if (this.fish) buildable.push("Fish Farm");
         if (this.solar) buildable.push("Solar Panel");
         if (this.animal) buildable.push("Ranch");
-        if (this.tree) buildable.push("Forest");
+        if (this.tile.biome.includes("forest")) buildable.push("Forest");
         if (this.wind) buildable.push("Wind Turbine");
         return buildable;
     }
@@ -53149,11 +53263,11 @@ module.exports = class Resource {
         if (this.tree) string += this.tree + " 🌲 Forest\n\n";
         if (this.coal) string += this.coal + " ⛏️ Coal\n\n";
         if (this.solar) string += this.solar + " ☀️ Sunlight\n\n";
-        if (string == "\n") string += "No Resources"
+        if (string == "\n") string += "No Resources\n\n"
         return string;
     }
 }
-},{"./building":74,"./constants":75,"./util":81}],79:[function(require,module,exports){
+},{"./building":74,"./constants":75,"./util":82}],80:[function(require,module,exports){
 module.exports={
     "Fish Farm": "https://i.imgur.com/1KweeyJ.png",
     "Forest": "https://i.imgur.com/3ATXtVU.png",
@@ -53164,9 +53278,9 @@ module.exports={
     "Wind Turbine": "https://i.imgur.com/LhotNmZ.png",
     "Drill Platform": "https://i.imgur.com/jwXNVOA.png"
 }
-},{}],80:[function(require,module,exports){
+},{}],81:[function(require,module,exports){
 const PIXI = require("pixi.js");
-const { Border, TileSize } = require("./constants");
+const { Border, FishRange, AnimalRange, ForestRange, CoalRange, OilRange } = require("./constants");
 const Resource = require("./resource");
 const Building = require("./building");
 const { centeroid, distanceTo, biome, capitalize, bound } = require("./util");
@@ -53174,6 +53288,7 @@ const MapCenter = {
     x: Border.x / 2,
     y: Border.y / 2
 }
+const Swal = require("sweetalert2").default;
 
 module.exports = class Tile {
 
@@ -53189,10 +53304,11 @@ module.exports = class Tile {
         this.shape = new PIXI.Graphics();
         this.shape.hitArea = this.polygon;
         this.shape.interactive = true;
+
         this.shape.on("click", e => this.onClick(e));
+        this.shape.on("touchstart", e => this.onClick(e));
         this.shape.on("mouseover", e => this.onMouseover(e));
         this.scale = Math.max(this.bound.xMax - this.bound.xMin, this.bound.yMax - this.bound.yMin) / 100;
-        
         /** @type {import("./building")} */
         this.building = undefined;
         this.updateBiome();
@@ -53212,11 +53328,10 @@ module.exports = class Tile {
         this.biome = biome(height, moist);
     }
 
-    generateGraphics(drawBorder) {
+    generateGraphics(drawBorder, disaster) {
 
         let shape = this.shape;
         this.shape.clear();
-
         if (drawBorder) {
             if (this.game.selectedTile == this) {
                 shape.lineStyle(3, 0x00FF00, 1);
@@ -53225,6 +53340,13 @@ module.exports = class Tile {
             }
         } else {
             shape.lineStyle(0, 0xFFFFFF, 0)
+        }
+        if (this.building) {
+            if (!this.building.functional) shape.lineStyle(3, 0xFF0000, 1);
+            else if (this.building.warning) shape.lineStyle(3, 0xFFFF00, 1);
+        }
+        if (disaster) {
+            shape.lineStyle(6, 0xFF0000, 1);
         }
         shape.drawPolygon(this.polygon);
     }
@@ -53236,15 +53358,27 @@ module.exports = class Tile {
     /** @param {import("pixi.js").interaction.InteractionEvent} e */
     onClick(e) {
         this.game.clickTile(this, e.data.global);
+        
     }
 
     /** @param {import("pixi.js").interaction.InteractionEvent} e */
     onMouseover(e) {
-        this.game.mouseOverTile(this, e.data.global);
+        try {
+            this.game.mouseOverTile(this, e.data.global);
+        } catch (e) {
+            Swal.fire(e.message, e.stack, "error");
+        }
     }
 
     getText() {
-        return `${capitalize(this.biome)}\n${this.resource.ToString()}${this.building ? this.building.type : ""}`
+        let string = `${capitalize(this.biome)}\n${this.resource.ToString()}`;
+        if (this.building) {
+            string += this.building.type;
+            if (!this.building.functional) {
+                string += "(Not functional)"
+            }
+        }
+        return string
     }
 
     canBuild() {
@@ -53267,14 +53401,87 @@ module.exports = class Tile {
     }
 
     destroyBuilding() {
+        if (!this.building) return;
         this.game.viewport.removeChild(this.buildingSprite);
         this.buildingSprite = undefined;
         this.resource.age = 0;
         this.game.buildings.splice(this.game.buildings.indexOf(this.building), 1);
+        if (this.building.type == "Forest") this.resource.tree = 0; 
         this.building = undefined;
     }
+
+    isOcean() {
+        return this.biome == "ocean" || this.biome == "beach";
+    }
+
+    updateResource() {
+        if (this.building) {
+            switch (this.building.type) {
+                case "Fish Farm":
+                    if (this.resource.fish <= 0) {
+                        this.generateGraphics();
+                        this.building.disable();
+                    } else {
+                        this.resource.fish -= 5;
+                        this.resource.fish = Math.max(this.resource.fish, 0);
+                        if (this.resource.fish < FishRange[0]) {
+                            this.generateGraphics();
+                            this.building.warning = true;
+                        }
+                    }
+                    break;
+                case "Ranch":
+                    if (this.resource.animal <= 0) {
+                        this.generateGraphics();
+                        this.building.disable();
+                    } else {
+                        this.resource.animal -= 1;
+                        this.resource.animal = Math.max(this.resource.animal, 0);
+                        if (this.resource.animal < AnimalRange[0]) {
+                            this.generateGraphics();
+                            this.building.warning = true;
+                        }
+                    }
+                    break;
+                case "Forest":
+                    if (this.game.time % 10 == 0) {
+                        this.resource.tree += 10;
+                        this.resource.tree = Math.min(this.resource.tree, ForestRange[1]);
+                    }
+                    break;
+                case "Power Plant":
+                    if (this.resource.coal <= 0) {
+                        this.generateGraphics();
+                        this.building.disable();
+                    } else {
+                        this.resource.coal -= 10;
+                        this.resource.coal = Math.max(this.resource.coal, 0);
+                        if (this.resource.coal < CoalRange[0]) {
+                            this.generateGraphics();
+                            this.building.warning = true;
+                        }
+                    }
+                    break;
+
+                case "Oil Drill":
+                case "Drill Platform":
+                    if (this.resource.oil <= 0) {
+                        this.generateGraphics();
+                        this.building.disable();
+                    } else {
+                        this.resource.oil -= 10;
+                        this.resource.oil = Math.max(this.resource.oil, 0);
+                        if (this.resource.oil < OilRange[0]) {
+                            this.generateGraphics();
+                            this.building.warning = true;
+                        }
+                    }
+                    break;
+            }
+        }
+    }
 }
-},{"./building":74,"./constants":75,"./resource":78,"./util":81,"pixi.js":67}],81:[function(require,module,exports){
+},{"./building":74,"./constants":75,"./resource":79,"./util":82,"pixi.js":67,"sweetalert2":73}],82:[function(require,module,exports){
 module.exports = {
     /** @param {Number[][]} polygon */
     centeroid: polygon => {
@@ -53322,5 +53529,6 @@ module.exports = {
     randint: (min, max) => Math.floor(Math.random() * (max - min) + min),
     /** @param {String} s */
     capitalize: s => s.split(" ").map(v => v[0].toUpperCase() + v.slice(1)).join(" "),
+    select: arr => arr[Math.floor(Math.random() * arr.length)]
 }
-},{}]},{},[77]);
+},{}]},{},[78]);
