@@ -3,7 +3,9 @@ const Viewport = require("pixi-viewport");
 const { Delaunay } = require("d3-delaunay");
 const { Noise } = require("noisejs");
 const Tile = require("./tile");
-const { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, buttonOffset, buttonBox, gameTick } = require("./constants");
+let { Border, NumTiles, Octaves, OceanCutoff, TextureScaleDown, ViewBox, 
+    buttonOffset, buttonBox, gameTick, foodBarWidth, foodBarMargin, MaxFood, MaxEnergy,
+    ignoreOffset, ignoreBox } = require("./constants");
 const { centeroid, distanceTo, select } = require("./util");
 const Swal = require("sweetalert2").default;
 const MapCenter = {
@@ -30,13 +32,16 @@ module.exports = class Game {
             allowOutsideClick: false,
             allowEscapeKey: false,
             allowEnterKey: false
-        }).then(() => this.init());
+        }).then(() => this.showTutorial().then(() => this.init()));
 
         this.CO2Emission = 0;
         this.temperature = 0;
         this.hazardWeatherRate = 0.01;
         this.time = 0;
+        this.food = 1000;
+        this.totalEnergy = 100;
         this.lastNaturalDisaster = -100;
+        this.ignoreDisaster = true;
         /** @type {Tile} */
         this.tileMouseover = undefined;
         this.paused = false;
@@ -44,7 +49,7 @@ module.exports = class Game {
 
     init() {
         for (let key in Sprites) {
-            this.textures[key] = PIXI.Texture.from(Sprites[key]);
+            this.textures[key] = PIXI.Texture.from(Sprites[key].url);
         }
         Swal.fire({
             title: "Generating Map...",
@@ -61,6 +66,7 @@ module.exports = class Game {
                     this.generateBackground();
                     this.generateMap();
                     this.gameloop = setInterval(() => this.tick(), gameTick);
+                    Swal.close();
                 }, 500);
             }
         });
@@ -127,6 +133,54 @@ module.exports = class Game {
         this.tileViewer.addChild(tileText);
         this.tileText = tileText;
         this.population = 1000;
+
+        const foodBar = new PIXI.Graphics();
+        foodBar.position.set(0, 0);
+        this.foodBar = foodBar;
+        stage.addChild(foodBar);
+
+        const foodText = new PIXI.Text("Food\n" + this.food, 
+            {fontFamily : 'Arial', fontSize: 20, fill : 0xcef442, align : 'center'});
+        foodText.position.set(foodBarMargin + 2 * foodBarWidth, foodBarMargin);
+        this.foodText = foodText;
+        stage.addChild(foodText);
+
+        const energyBar = new PIXI.Graphics();
+        energyBar.position.set(window.innerWidth, 0);
+        this.energyBar = energyBar;
+        stage.addChild(energyBar);
+
+        const energyText = new PIXI.Text("Energy\n0.1%", 
+            {fontFamily : 'Arial', fontSize: 20, fill : 0xf4cd41, align : 'center'});
+        energyText.position.set(window.innerWidth - 3 * foodBarWidth - foodBarMargin, foodBarMargin);
+        this.energyText = energyText;
+        stage.addChild(energyText);
+
+        const ignoreText = new PIXI.Text("Ignore Disasters", 
+            {fontFamily : 'Arial', fontSize: 14, fontWeight: "bold",
+             fill : 0xffffff, align : 'center'});
+        ignoreText.anchor.set(0, 0.5);
+        
+        const ignoreButton = new PIXI.Graphics();
+        ignoreButton.pivot.set(0.5, 0.5);
+        ignoreButton.position.set(ignoreOffset.x, ignoreOffset.y);
+        ignoreButton.alpha = 0.5;
+        const toggle = () => {
+            ignoreButton.clear();
+            ignoreButton.beginFill(!this.ignoreDisaster ? 0x8af725 : 0xff0000, 1);
+            ignoreButton.drawRoundedRect(-ignoreBox.y / 2, -ignoreBox.y / 2,
+                ignoreBox.x, ignoreBox.y, 6);
+            ignoreButton.endFill();
+            ignoreText.alpha = 1;
+            ignoreText.text = !this.ignoreDisaster ? "Show Disasters" : "Ignore Disasters";
+            this.ignoreDisaster = !this.ignoreDisaster;
+        }
+        toggle();
+        ignoreButton.interactive = true;
+        ignoreButton.on("click", () => toggle());
+
+        ignoreButton.addChild(ignoreText);
+        stage.addChild(ignoreButton);
     
         viewport
             .drag()
@@ -147,6 +201,36 @@ module.exports = class Game {
             .decelerate();
         this.app = app;
         this.viewport = viewport;
+    }
+
+    updateFoodDisplay() {
+        let totalHeight = window.innerHeight - 2 * foodBarMargin;
+        this.foodBar.clear();
+        let percent = this.food / MaxFood;
+        this.foodBar.beginFill(0xaaaaaa, 0.5);
+        this.foodBar.drawRoundedRect(foodBarMargin, foodBarMargin, 
+            foodBarWidth, totalHeight, 5);
+        this.foodBar.endFill();
+        this.foodBar.beginFill(0xcef442);
+        this.foodBar.drawRoundedRect(foodBarMargin, foodBarMargin + (1 - percent) * totalHeight, 
+            foodBarWidth, percent * totalHeight, 5);
+        this.foodBar.endFill();
+        this.foodText.text = "Food\n" + ~~(this.food);
+    }
+
+    updateEnergyDisplay() {
+        let totalHeight = window.innerHeight - 2 * foodBarMargin;
+        this.energyBar.clear();
+        let percent = this.totalEnergy / MaxEnergy;
+        this.energyBar.beginFill(0xaaaaaa, 0.5);
+        this.energyBar.drawRoundedRect(- foodBarMargin - foodBarWidth, foodBarMargin, 
+            foodBarWidth, totalHeight, 5);
+        this.energyBar.endFill();
+        this.energyBar.beginFill(0xf4cd41);
+        this.energyBar.drawRoundedRect(- foodBarMargin - foodBarWidth, foodBarMargin + (1 - percent) * totalHeight, 
+            foodBarWidth, percent * totalHeight, 5);
+        this.energyBar.endFill();
+        this.energyText.text = "Energy\n" + (percent * 100).toFixed(1) + "%";
     }
 
     /** @param {PIXI.interaction.InteractionEvent} e */
@@ -178,15 +262,24 @@ module.exports = class Game {
     /** @param {import("./tile")} tile */
     promptBuild(tile) {
         let availableBuild = tile.resource.getBuildable();
+        this.pause();
         Swal.fire({
             title: "Available Build",
-            html: availableBuild.map(b => `<img width=100, height=100, src="${Sprites[b]}" style="margin: 10px" id="${b}">`).join(""),
+            html: "<div style='display:table'>" + availableBuild.map(b => `<div style="display: table-cell; width:100px;">
+                    <img width=100, height=100, src="${Sprites[b].url}" style="margin: 10px" id="${b}"><br>Cost: ${Sprites[b].cost}
+                                            </div>`).join("") + "</div>",
             onBeforeOpen: () => {
                 let $ = Swal.getContent().querySelectorAll.bind(Swal.getContent());
                 $("img").forEach(img => img.addEventListener("click", () => {
-                    this.selectedTile.build(img.id);
-                    this.disselect();
-                    Swal.close();
+                    if (this.food < Sprites[img.id].cost) {
+                        Swal.fire("Not enough food", `You need ${~~(Sprites[img.id].cost - this.food)} more food to build ${img.id}`, "error");
+                    } else {
+                        this.food -= Sprites[img.id].cost;
+                        this.selectedTile.build(img.id);
+                        this.disselect();
+                        Swal.close();
+                    }
+                    this.resume();
                 }));
             },
             width: availableBuild.length * 120 + 50,
@@ -199,8 +292,73 @@ module.exports = class Game {
         }).then(result => {
             if (result.dismiss == "cancel") {
                 this.disselect();
+                this.resume();
             }
         });
+    }
+
+    showTutorial() {
+        return Swal.mixin({
+            confirmButtonText: 'Next &rarr;',
+            showCancelButton: true,
+            progressSteps: ['0', '1', '2', '3', '4']
+        }).queue([
+        {
+            title: "Tutorial",
+            imageUrl: 'https://i.imgur.com/v3zLi5p.png',
+            confirmButtonText: "Start",
+            cancelButtonText: "Skip",
+            cancelButtonColor: "red"
+        },
+        {
+            title: 'Destroy and Build',
+            imageUrl: "https://i.imgur.com/UaB119t.jpg",
+            imageWidth: 600,
+            imageHeight: 600,
+            width: 700,
+            text: "Click to destroy or build utilities on a tile",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false,
+            showCancelButton: false
+        },
+        {
+            title: 'Collect Food',
+            imageUrl: "https://i.imgur.com/1ESuaqV.jpg",
+            imageWidth: 600,
+            imageHeight: 600,
+            width: 700,
+            text: "Build Fish Farm or Ranch to collect food for building other utilities.",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false,
+            showCancelButton: false
+        },
+        {
+            title: 'Out of Resource',
+            imageUrl: "https://i.imgur.com/sHSKgfo.png",
+            imageWidth: 600,
+            imageHeight: 600,
+            width: 700,
+            text: "Resource will run out in a while",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false,
+            showCancelButton: false
+        },
+        {
+            title: 'Collecting Energy',
+            imageUrl: 'https://i.imgur.com/wFxRdtX.jpg',
+            imageWidth: 600,
+            imageHeight: 600,
+            width: 700,
+            text: "These utilities provide energy. Reach 100% to win the game!",
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false,
+            showCancelButton: false,
+            confirmButtonText: "Got it!"
+        }]);
     }
 
     disselect() {
@@ -253,22 +411,53 @@ module.exports = class Game {
         if (this.paused) return;
         this.time++;
         this.CO2Emission = this.calculateEmission() - this.forestAbsorption();
-        this.temperature += 0.00001 * this.CO2Emission;
-        this.temperature = Math.min(Math.max(this.temperature, 0), 995);
-        this.hazardWeatherRate = 0.01 * this.temperature + 0.005;
-
+        this.temperature += 0.00005 * this.CO2Emission;
+        this.temperature = Math.min(Math.max(this.temperature, 0), 99.99);
+        this.hazardWeatherRate = 0.01 * this.temperature + 0.0001;
+        this.calculateEnergy();
+        this.calculateFood();
+        this.updateFoodDisplay();
+        this.updateEnergyDisplay();
+        this.checkLose();
         if (Math.random() <= this.hazardWeatherRate) {
-            this.createNaturalDisaster();
+            this.createNaturalDisaster(~~(this.temperature / 5));
         }
         this.updateResources();
         this.updateViewer(this.selectedTile || this.tileMouseover);
 
-        if (this.time % 100 == 0) console.log(`Emission: ${this.CO2Emission.toFixed(2)}, Temperature ${this.temperature.toFixed(2)}`);
+        if (this.time % 100 == 0) console.log(`Emission: ${this.CO2Emission.toFixed(2)}, Temperature ${this.temperature.toFixed(2)}, Food: ${this.food.toFixed(0)}`);
+    }
+
+    checkLose() {
+        if (this.buildings.length == 0) {
+            this.pause();
+            Swal.fire({
+                title: "Game Over",
+                html: "<img src='https://cdn.gearpatrol.com/wp-content/uploads/2012/12/guide-to-apocalypse-gear-patrol-lead-full.jpg' width=600px>",
+                width: 700,
+                showCancelButton: true,
+                cancelButtonColor: "#26a4ff",
+                cancelButtonText: "Try Again",
+                showConfirmButton: true,
+                confirmButtonText: "Why did I lose?",
+                confirmButtonColor: "#8af725",
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                allowEnterKey: false
+            }).then(result => {
+                if (result.dismiss == "cancel") {
+                    window.location.reload();
+                } else {
+                    this.checkLose();
+                    window.open("https://sites.google.com/view/ucsd-fight-climate-change/home");
+                }
+            });
+        }
     }
 
     updateResources() {
         for (let tile of this.tiles) {
-            tile.updateResource()
+            tile.updateResource();
         }
     }
 
@@ -292,6 +481,40 @@ module.exports = class Game {
         return sum
     }
 
+    calculateEnergy() {
+        for (let building of this.buildings) {
+            if (!building.functional) continue;
+            switch (building.type) {
+                case "Power Plant":
+                    this.totalEnergy += 1;
+                    break;
+                case "Drill Platform":
+                case "Oil Drill":
+                    this.totalEnergy += 0.5;
+                    break;
+                case "Solar Panel":
+                case "Wind Turbine":
+                    this.totalEnergy += 0.01;
+                    break;
+            }
+        }
+    }
+
+    calculateFood() {
+        for (let building of this.buildings) {
+            if (!building.functional) continue;
+            switch (building.type) {
+                case "Ranch":
+                    this.food += 1;
+                    break;
+                case "Fish Farm":
+                    this.food += 0.8;
+                    break;
+            }
+        }
+        this.food = Math.min(this.food, MaxFood);
+    }
+
     forestAbsorption() {
         let sum = 0;
         for (let building of this.buildings) {
@@ -304,15 +527,15 @@ module.exports = class Game {
         return Math.floor(sum)
     }
 
-    createNaturalDisaster() {
-        if (this.time - this.lastNaturalDisaster < 3000 / gameTick) return;
+    createNaturalDisaster(times) {
+        if (times <= 0 || this.time - this.lastNaturalDisaster < 3000 / gameTick / (1 + this.temperature / 5)) return;
         this.lastNaturalDisaster = this.time;
         console.log(`Disaster!! Rate: ${this.hazardWeatherRate}`);
-        this.pause();
+        if (!this.ignoreDisaster) this.pause();
         /** @type {Tile} */
-        let randomTile = select(this.tiles);
-        console.log(randomTile.biome, randomTile.isOcean());
-        this.viewport.snap(...randomTile.center, {interrupt: false,removeOnComplete: true});
+        let randomTile = select(this.buildings).tile;
+        // console.log(randomTile.biome, randomTile.isOcean());
+        if (!this.ignoreDisaster) this.viewport.snap(...randomTile.center, {interrupt: false,removeOnComplete: true, time: 500});
         let disaster;
         if (randomTile.isOcean()) {
             disaster = select(Disasters["ocean"]);
@@ -320,24 +543,45 @@ module.exports = class Game {
             disaster = select(Disasters["land"]);
         }
         if (randomTile.building) randomTile.building.disable();
-        this.disselect();
+        if (!this.ignoreDisaster) this.disselect();
         randomTile.generateGraphics(true, true);
-        setTimeout(() => {
-            Swal.fire({
-                title: disaster.name + (randomTile.building ? `destroyed the ${randomTile.building.type} here`: ""),
-                html: `<img width=600 height=400 src="${disaster.url}">`,
-                width: 700,
-                confirmButtonText: "Oh no...",
-                confirmButtonColor: "#29aec6",
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                allowEnterKey: false,
-                onBeforeOpen: () => randomTile.destroyBuilding()
-            }).then(() => {
-                this.resume();
-                randomTile.generateGraphics();
-            })
-        }, 2000);
+        if (this.ignoreDisaster) {
+            randomTile.destroyBuilding();
+            if (times >= 1) {
+                this.createNaturalDisaster(times - 1);
+            }
+            setTimeout(() => randomTile.generateGraphics(), 1000);
+            this.resume();
+        } else {
+            setTimeout(() => {
+                Swal.fire({
+                    title: disaster.name + (randomTile.building ? ` destroyed the ${randomTile.building.type} here`: ""),
+                    html: `<img width=600 height=400 src="${disaster.url}">`,
+                    width: 700,
+                    showConfirmButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    allowEnterKey: false,
+                    onBeforeOpen: () => {
+                        randomTile.destroyBuilding();
+                        setTimeout(() => {
+                            if (times > 1) {
+                                Swal.close();
+                                this.resume();
+                                this.createNaturalDisaster(times - 1);
+                            } else {
+                                Swal.close();
+                                this.resume();
+                            }
+                            randomTile.generateGraphics();
+                        }, 1500);
+                    }
+                }).then(() => {
+                    this.resume();
+                    randomTile.generateGraphics();
+                })
+            }, 800);
+        }
     }
 
     generateBackground() {
@@ -428,6 +672,9 @@ module.exports = class Game {
     
         this.tiles = polygons.map(polygon => new Tile(this, polygon));
         this.tiles.forEach(tile => this.addTile(tile));
+        let land = 0;
+        this.tiles.forEach(tile => { if (!tile.isOcean()) land++});
+        MaxEnergy = MaxEnergy * land / 50;
         this.viewport.fitHeight(Border.y);
         this.viewport.moveCenter(Border.x / 2, Border.y / 2);
         

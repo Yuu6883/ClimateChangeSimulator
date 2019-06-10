@@ -141,7 +141,7 @@ module.exports = class Tile {
                         this.generateGraphics();
                         this.building.disable();
                     } else {
-                        this.resource.fish -= 5;
+                        this.resource.fish -= 3;
                         this.resource.fish = Math.max(this.resource.fish, 0);
                         if (this.resource.fish < FishRange[0]) {
                             this.generateGraphics();
@@ -173,7 +173,7 @@ module.exports = class Tile {
                         this.generateGraphics();
                         this.building.disable();
                     } else {
-                        this.resource.coal -= 10;
+                        this.resource.coal -= 1;
                         this.resource.coal = Math.max(this.resource.coal, 0);
                         if (this.resource.coal < CoalRange[0]) {
                             this.generateGraphics();
@@ -188,7 +188,7 @@ module.exports = class Tile {
                         this.generateGraphics();
                         this.building.disable();
                     } else {
-                        this.resource.oil -= 10;
+                        this.resource.oil -= 1;
                         this.resource.oil = Math.max(this.resource.oil, 0);
                         if (this.resource.oil < OilRange[0]) {
                             this.generateGraphics();
@@ -196,6 +196,16 @@ module.exports = class Tile {
                         }
                     }
                     break;
+            }
+        } else {
+            if (this.isOcean() && this.resource.fish < FishRange[1]) {
+                if (this.game.time % 10 == 0) {
+                    this.resource.fish += 5;
+                }
+            } else if (!this.isOcean() && this.resource.animal < AnimalRange[1]) {
+                if (this.game.time % 10 == 0) {
+                    this.resource.animal += 5;
+                }
             }
         }
     }
