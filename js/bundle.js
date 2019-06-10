@@ -53212,14 +53212,15 @@ module.exports = class Game {
     win() {
         this.pause();
         Swal.fire({
-            title: "You Won! <br>" + `<div class="fb-share-button" data-href="https://ucsdgame.dev/earth" data-layout="button_count">Share</div>`,
+            title: "You Won!",
             imageUrl: 'https://i.imgur.com/HTIBIQv.png',
             imageWidth: 600,
             width: 700,
             showCancelButton: true,
             cancelButtonColor: "#26a4ff",
             cancelButtonText: "Play Again",
-            showConfirmButton: false,
+            showConfirmButton: true,
+            confirmButtonText: "Share on Facebook",
             allowOutsideClick: false,
             allowEscapeKey: false,
             allowEnterKey: false
@@ -53227,6 +53228,7 @@ module.exports = class Game {
             if (result.dismiss == "cancel") {
                 window.location.reload();
             } else {
+                window.open("https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fucsdgame.dev%2Fearth&amp;src=sdkpreparse");
                 this.win();
             }
         });
