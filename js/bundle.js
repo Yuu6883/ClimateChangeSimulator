@@ -52773,6 +52773,8 @@ module.exports = class Game {
                     this.generateMap();
                     this.gameloop = setInterval(() => this.tick(), gameTick);
                     Swal.close();
+                    window.game = this;
+                    console.log("Done Init");
                 }, 500);
             }
         });
@@ -53204,6 +53206,32 @@ module.exports = class Game {
                     break;
             }
         }
+        this.totalEnergy = Math.min(MaxEnergy, this.totalEnergy);
+        if (this.totalEnergy == MaxEnergy) this.win(); 
+    }
+
+    win() {
+        this.pause();
+        Swal.fire({
+            title: "You Won!",
+            imageUrl: 'https://i.imgur.com/HTIBIQv.png',
+            imageWidth: 600,
+            width: 700,
+            html: '<div class="fb-share-button" data-href="https://ucsdgame.dev/earth" data-layout="button" data-size="small"><a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fucsdgame.dev%2Fearth&amp;src=sdkpreparse" class="fb-xfbml-parse-ignore">Share</a></div>',
+            showCancelButton: true,
+            cancelButtonColor: "#26a4ff",
+            cancelButtonText: "Play Again",
+            showConfirmButton: false,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false
+        }).then(result => {
+            if (result.dismiss == "cancel") {
+                window.location.reload();
+            } else {
+                this.win();
+            }
+        });
     }
 
     calculateFood() {
