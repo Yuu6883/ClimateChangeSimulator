@@ -53212,14 +53212,13 @@ module.exports = class Game {
     win() {
         this.pause();
         Swal.fire({
-            title: "You Won!",
-            imageUrl: 'https://i.imgur.com/HTIBIQv.png',
-            imageWidth: 600,
-            width: 700,
-            html: `<div class="fb-share-button" 
+            title: "You Won! <br>" + `<div class="fb-share-button" 
             data-href="https://ucsdgame.dev/earth" 
             data-layout="button_count">
           </div>`,
+            imageUrl: 'https://i.imgur.com/HTIBIQv.png',
+            imageWidth: 600,
+            width: 700,
             showCancelButton: true,
             cancelButtonColor: "#26a4ff",
             cancelButtonText: "Play Again",
