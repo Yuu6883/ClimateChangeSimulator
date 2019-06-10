@@ -45,6 +45,7 @@ module.exports = class Game {
         /** @type {Tile} */
         this.tileMouseover = undefined;
         this.paused = false;
+        window.game = this;
     }
 
     init() {
