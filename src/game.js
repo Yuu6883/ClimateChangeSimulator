@@ -509,7 +509,7 @@ module.exports = class Game {
             imageUrl: 'https://i.imgur.com/HTIBIQv.png',
             imageWidth: 600,
             width: 700,
-            html: '<>',
+            html: '<div class="fb-share-button" data-href="https://ucsdgame.dev/earth" data-layout="button" data-size="small"><a target="_blank" href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fucsdgame.dev%2Fearth&amp;src=sdkpreparse" class="fb-xfbml-parse-ignore">Share</a></div>',
             showCancelButton: true,
             cancelButtonColor: "#26a4ff",
             cancelButtonText: "Play Again",
