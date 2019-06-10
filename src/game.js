@@ -45,7 +45,6 @@ module.exports = class Game {
         /** @type {Tile} */
         this.tileMouseover = undefined;
         this.paused = false;
-        window.game = this;
     }
 
     init() {
@@ -68,6 +67,8 @@ module.exports = class Game {
                     this.generateMap();
                     this.gameloop = setInterval(() => this.tick(), gameTick);
                     Swal.close();
+                    window.game = this;
+                    console.log("Done Init");
                 }, 500);
             }
         });
