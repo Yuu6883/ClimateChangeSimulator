@@ -70,6 +70,7 @@ module.exports = class Game {
                 }, 500);
             }
         });
+        window.game = this;
     }
 
     initApp() {
