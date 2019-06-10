@@ -53012,7 +53012,7 @@ module.exports = class Game {
         }).queue([
         {
             title: "Tutorial",
-            imageUrl: 'https://i.imgur.com/v3zLi5p.png',
+            imageUrl: 'https://i.imgur.com/9ngFgE0.jpg',
             confirmButtonText: "Start",
             cancelButtonText: "Skip",
             cancelButtonColor: "red"
@@ -53212,10 +53212,7 @@ module.exports = class Game {
     win() {
         this.pause();
         Swal.fire({
-            title: "You Won! <br>" + `<div class="fb-share-button" 
-            data-href="https://ucsdgame.dev/earth" 
-            data-layout="button_count">
-          </div>`,
+            title: "You Won! <br>" + `<div class="fb-share-button" data-href="https://ucsdgame.dev/earth" data-layout="button_count"> </div>`,
             imageUrl: 'https://i.imgur.com/HTIBIQv.png',
             imageWidth: 600,
             width: 700,
