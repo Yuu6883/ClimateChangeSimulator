@@ -52928,7 +52928,7 @@ module.exports = class Game {
     updateEnergyDisplay() {
         let totalHeight = window.innerHeight - 2 * foodBarMargin;
         this.energyBar.clear();
-        let percent = this.totalEnergy / MaxEnergy;
+        let percent = Math.min(this.totalEnergy / MaxEnergy, 1);
         this.energyBar.beginFill(0xaaaaaa, 0.5);
         this.energyBar.drawRoundedRect(- foodBarMargin - foodBarWidth, foodBarMargin, 
             foodBarWidth, totalHeight, 5);
@@ -53205,8 +53205,7 @@ module.exports = class Game {
                     break;
             }
         }
-        this.totalEnergy = Math.min(MaxEnergy, this.totalEnergy);
-        if (this.totalEnergy == MaxEnergy) this.win(); 
+        if (this.totalEnergy >= MaxEnergy) this.win(); 
     }
 
     win() {
