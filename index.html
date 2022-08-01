@@ -1,28 +1,41 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <meta name="title" content="Earth Simulator">
-        <meta name="og:title" content="Earth Simulator">
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="title" content="Earth Simulator" />
+        <meta name="og:title" content="Earth Simulator" />
         <meta property="og:type" content="game" />
-        <meta name="og:url" content="https://ucsdgame.dev/earth">
-        <meta name="og:description" content="A Game about Climate Change">
-        <meta name="og:image" content="https://i.imgur.com/9ngFgE0.jpg">
+        <meta
+            name="og:url"
+            content="https://yuu6883.github.io/ClimateChangeSimulator/"
+        />
+        <meta name="og:description" content="A Game about Climate Change" />
+        <meta name="og:image" content="https://i.imgur.com/9ngFgE0.jpg" />
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.3/umd/popper.min.js"></script>
-        <script src="js/bundle.js"></script>
-        <link rel="stylesheet" href="css/main.css">
+        <script src="bundle.js"></script>
+        <link rel="stylesheet" href="main.css" />
     </head>
     <body>
         <div id="fb-root"></div>
-        <script>(function(d, s, id) {
-                var js, fjs = d.getElementsByTagName(s)[0];
+        <script>
+            (function (d, s, id) {
+                var js,
+                    fjs = d.getElementsByTagName(s)[0];
                 if (d.getElementById(id)) return;
-                js = d.createElement(s); js.id = id;
-                js.src = "https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.0";
+                js = d.createElement(s);
+                js.id = id;
+                js.src =
+                    "https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v3.0";
                 fjs.parentNode.insertBefore(js, fjs);
-              }(document, 'script', 'facebook-jssdk'));</script>
-        <img src="https://i.imgur.com/iaZXc07.png" id="gradient" style="visibility: hidden; position: fixed;" crossorigin="anonymous">
+            })(document, "script", "facebook-jssdk");
+        </script>
+        <img
+            src="https://i.imgur.com/iaZXc07.png"
+            id="gradient"
+            style="visibility: hidden; position: fixed"
+            crossorigin="anonymous"
+        />
     </body>
 </html>

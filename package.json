@@ -1,18 +1,21 @@
 {
-  "name": "wcwpgame",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "browserify src/main.js -o js/bundle.js && git add -A && git commit -m AutoUpdate && git push origin master"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "d3-delaunay": "^4.1.5",
-    "noisejs": "^2.1.0",
-    "pixi-viewport": "^3.23.2",
-    "pixi.js": "^5.0.3",
-    "sweetalert2": "^8.11.7"
-  }
+    "name": "wcwpgame",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "build": "browserify src/main.js -o build/bundle.js && cp index.html main.css build/"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "d3-delaunay": "^4.1.5",
+        "noisejs": "^2.1.0",
+        "pixi-viewport": "^3.23.2",
+        "pixi.js": "^5.0.3",
+        "sweetalert2": "^8.11.7"
+    },
+    "devDependencies": {
+        "browserify": "^17.0.0"
+    }
 }
