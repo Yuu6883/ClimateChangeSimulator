@@ -4,7 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "build": "browserify src/main.js -o build/bundle.js && cp index.html main.css build/"
+        "build": "browserify src/main.js -o build/bundle.js && cp index.html build/"
     },
     "author": "",
     "license": "ISC",
